@@ -338,7 +338,7 @@ def ensure_apk():
     if _app_installed():
         return
     apk = None
-    if os.environ.get("GITHUB_ACTIONS") == "true":
+    if os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("LYNKCO_APK_SOURCE") != "official":
         # 写死上游仓库：fork 无 Release（fork 不复制 Release），动态拼
         # GITHUB_REPOSITORY 在 fork 上必然 404；失败仍有官方 CDN 兜底
         rel_url = ("https://github.com/shovelshit/LynkCoHelper/releases/download/"
@@ -730,13 +730,13 @@ def _in_ci():
 
 
 def mask_secret(v):
-    """脱敏显示：仅 CI（公开日志）生效——前 3 后 2 可见，中间以 *** 代替；
+    """脱敏显示：仅 CI（公开日志）生效——隐藏完整值，只保留长度；
     本地环境返回原值，方便直接复制使用。"""
     if not v or not _in_ci():
         return v
     if len(v) <= 8:
         return "***"
-    return v[:3] + "***" + v[-2:]
+    return "<hidden:" + str(len(v)) + ">"
 
 
 def scrub_jdb(out):
@@ -786,6 +786,7 @@ def maybe_write_env(key, secret):
     with open(ENV_JSON, "w", encoding="utf-8") as f:
         json.dump(env, f, ensure_ascii=False, indent=2)
         f.write("\n")
+    os.chmod(ENV_JSON, 0o600)
     print(f"[+] 已写入 {ENV_JSON}（该文件已被 gitignore，不会入库）")
 
 
@@ -829,7 +830,7 @@ def run_once():
         print(f"[*] Using jdb: {JDB}")
         child = pexpect.spawn(f"{shlex.quote(JDB)} -attach 127.0.0.1:{PROXY_PORT}",
                               timeout=60, encoding="utf-8")
-        child.logfile = ScrubStream()
+        child.logfile = None if _in_ci() else ScrubStream()
 
         # 等 jdb 完成与代理的 TCP 连接（握手暂时挂起）
         for _ in range(50):

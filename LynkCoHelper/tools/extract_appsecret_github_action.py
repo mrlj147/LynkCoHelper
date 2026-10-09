@@ -468,8 +468,7 @@ def main():
                  "（x86_64 镜像 + KVM + libndk 翻译 arm64 库）。")
     if _IS_X86_IMAGE:
         print("[*] 实验模式：x86_64 镜像 + KVM，领克 arm64 库经 libndk 翻译执行。")
-        print("    已实证：壳翻译执行约 3 秒即 SIGSEGV（run 33768167646），"
-              "本路线预期失败，仅作复现验证。")
+        print("    使用固定 API33 r09 镜像和 31.3.10 模拟器，保留 ARM 翻译层。")
     core.ensure_pexpect()
     core.setup(ensure_adb(), ensure_jdb())
     print(f"[*] adb: {core.ADB}")

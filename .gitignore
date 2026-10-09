@@ -144,3 +144,8 @@ node_modules/
 
 # Local dev cache (miniflare)
 .state/
+
+# Private recipient keys and extracted delivery files
+*.private.pem
+appsecret.bundle.json
+appsecret-decrypted.json

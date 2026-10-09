@@ -24,3 +24,11 @@
 - [ ] 登录滑块验证码全自动化：极验人机验证无法自动完成，仍需人工操作一次
 
 详细说明（配置方式、token 获取、AppSecret 自动提取、图文评论任务）见 [`LynkCoHelper/readme.md`](LynkCoHelper/readme.md)。
+
+## 本 fork 的每日 AppSecret 刷新
+
+`Daily AppSecret Refresh` 每天北京时间 00:37（GitHub 调度可能延迟）从最新版官方 APK 提取 `nativeAppKey` 和 `nativeAppSecret`。仅把 RSA-OAEP + AES-256-GCM 加密后的结果发布到 `appsecret-latest` Release，明文不上传、不提供公开领取链接。提取、字段校验或加密失败时不会替换上一份结果。
+
+仓库仅保存接收端公钥；私钥保存在接收服务的私有配置目录。接收端定时下载、校验来源和时效、解密并更新应用密钥，失败时保留现有配置。个人 Token、设备 ID、Bark 和模型密钥不经过该仓库。提取应用密钥不等于重新登录，也不能替代过期登录态所需的人机验证。
+
+本 fork 的签到和评论工作流改为手动触发，现有 VM 负责日常任务。密钥交付测试：`python -m unittest discover -s tests -v`。
