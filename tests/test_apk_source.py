@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'LynkCoHelper/tools'))
@@ -45,6 +45,32 @@ class VerifiedAPKTests(unittest.TestCase):
     def test_old_release_is_not_accepted_as_latest(self):
         release = dict(self.release, tag_name='apk-v4.2.7')
         self.assertIsNone(self.read_source(release=release))
+
+    def test_ci_metadata_auth_is_not_forwarded_to_redirects(self):
+        response = Mock(status_code=200)
+        response.json.return_value = self.release
+        def download(url, destination, size):
+            Path(destination).write_bytes(self.data)
+            return True
+        with patch.dict('os.environ', {'GH_TOKEN': 'fixture-api-token'}), \
+             patch('appsecret_core.TOOLS_DIR', str(self.folder)), \
+             patch('appsecret_core.urllib.request.urlopen', return_value=io.BytesIO(json.dumps(self.latest).encode())), \
+             patch('requests.get', return_value=response) as get, \
+             patch('appsecret_core._try_download', side_effect=download):
+            self.assertTrue(core._latest_verified_release_apk())
+        self.assertFalse(get.call_args.kwargs['allow_redirects'])
+
+    def test_ci_crash_diagnostics_never_emit_raw_log_values(self):
+        from contextlib import redirect_stdout
+        output = io.StringIO()
+        crash = 'Fatal signal SIGSEGV in libndk_translation.so; private-secret-fixture'
+        with patch.dict('os.environ', {'GITHUB_ACTIONS': 'true'}), \
+             patch('appsecret_core.adb', side_effect=['', 'x86_64,arm64-v8a', crash]), \
+             redirect_stdout(output):
+            core._dump_device_diagnostics('fixture')
+        self.assertNotIn('private-secret-fixture', output.getvalue())
+        self.assertIn('SIGSEGV', output.getvalue())
+        self.assertIn('libndk_translation.so', output.getvalue())
 
 
 if __name__ == '__main__':

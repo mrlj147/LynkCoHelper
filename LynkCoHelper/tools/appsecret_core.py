@@ -340,9 +340,19 @@ def _latest_verified_release_apk():
         if not re.fullmatch(r"[0-9]+(?:\.[0-9]+){1,3}", version):
             raise ValueError("invalid official APK version")
         metadata_url = "https://api.github.com/repos/shovelshit/LynkCoHelper/releases/tags/apk-v" + version
-        request = urllib.request.Request(metadata_url, headers={"User-Agent": "lynkco-helper", "Accept": "application/vnd.github+json"})
-        with urllib.request.urlopen(request, timeout=20) as response:
-            release = json.load(response)
+        headers = {"User-Agent": "lynkco-helper", "Accept": "application/vnd.github+json"}
+        token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+        if token:
+            import requests
+            response = requests.get(metadata_url, headers={**headers, "Authorization": "Bearer " + token},
+                                    timeout=20, allow_redirects=False)
+            if response.status_code != 200:
+                raise ValueError("APK metadata request rejected")
+            release = response.json()
+        else:
+            request = urllib.request.Request(metadata_url, headers=headers)
+            with urllib.request.urlopen(request, timeout=20) as response:
+                release = json.load(response)
         if release.get("tag_name") != "apk-v" + version:
             raise ValueError("APK release version mismatch")
         name = "lynkco-v" + version + ".apk"
@@ -837,6 +847,20 @@ def _dump_device_diagnostics(tag):
     CI runner 用后即焚，不现场抓证据就只能事后猜：2026-08-31 CI 实测三次
     握手超时却无任何设备侧信息，根因（如 APK 仅 arm64-v8a 与 x86_64 模拟器
     不兼容导致进程启动即死）完全无法定位。"""
+    if _in_ci():
+        try:
+            alive = bool(adb("shell", "pidof", APP).strip())
+            abi = adb("shell", "getprop", "ro.product.cpu.abilist").strip()
+            if not re.fullmatch(r"[A-Za-z0-9_,.-]*", abi):
+                abi = "unrecognized"
+            crash = adb("shell", "logcat", "-d", "-b", "crash", "-t", "100")
+            signals = [name for name in ("SIGSEGV", "SIGABRT", "SIGILL", "SIGBUS") if name in crash]
+            modules = sorted(set(re.findall(r"\b(lib[A-Za-z0-9_.-]+\.so)\b", crash)))[:15]
+            print("[*] Controlled device diagnostics: " + json.dumps({"process_alive": alive, "abi": abi,
+                                                                     "crash_signals": signals, "crash_modules": modules}))
+        except Exception as error:
+            print("[*] Device diagnostic collection failed: " + type(error).__name__)
+        return
     print(f"[*] 设备侧诊断（{tag}）：")
     try:
         alive = adb("shell", "pidof", APP).strip()
@@ -970,6 +994,8 @@ def run_once():
         idx = child.expect(BREAKPOINT_PATTERNS + [pexpect.EOF, pexpect.TIMEOUT],
                            timeout=_vt(90))
         if idx == len(BREAKPOINT_PATTERNS):
+            _dump_device_diagnostics("断点阶段 EOF")
+            print("[*] Debugger connection ended before the breakpoint.")
             raise Disconnected("等待断点期间 jdb 已退出（EOF）")
         if idx < len(BREAKPOINT_PATTERNS):
             print("\n[+] Breakpoint hit!")
