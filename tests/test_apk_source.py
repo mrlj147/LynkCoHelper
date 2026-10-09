@@ -46,6 +46,22 @@ class VerifiedAPKTests(unittest.TestCase):
         release = dict(self.release, tag_name='apk-v4.2.7')
         self.assertIsNone(self.read_source(release=release))
 
+    def test_compatible_release_is_verified_independently_of_latest_version(self):
+        release = {'tag_name': 'apk-latest', 'assets': [{'name': 'lynkco-latest.apk',
+                   'digest': 'sha256:' + hashlib.sha256(self.data).hexdigest()}]}
+        def download(url, destination, size):
+            self.assertIn('/apk-latest/lynkco-latest.apk', url)
+            Path(destination).write_bytes(self.data)
+            return True
+        with patch('appsecret_core.TOOLS_DIR', str(self.folder)), \
+             patch('appsecret_core.urllib.request.urlopen', return_value=io.BytesIO(json.dumps(release).encode())), \
+             patch('appsecret_core._try_download', side_effect=download):
+            self.assertEqual(Path(core._stable_verified_release_apk()).read_bytes(), self.data)
+
+    def test_missing_compatible_release_fails_without_using_an_unverified_apk(self):
+        with patch('appsecret_core._verified_release_apk', return_value=None), self.assertRaises(RuntimeError):
+            core._stable_verified_release_apk()
+
     def test_ci_metadata_auth_is_not_forwarded_to_redirects(self):
         response = Mock(status_code=200)
         response.json.return_value = self.release

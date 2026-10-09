@@ -37,13 +37,17 @@
 
 | Workflow | 触发 | 作用 |
 | --- | --- | --- |
-| `extract-appsecret` | 手动 | 全自动提取密钥 → 运行日志输出**一次性取件链接**（仅可打开 1 次、10 分钟失效），需手动填入 `LYNKCO_APP_SECRETS` 供 daily-tasks 使用 |
-| `fetch-lynkco-apk` | 每日 + 手动 | 拉取最新版领克 APK 上传 Release（`apk-v VERSION` 留历史 + `apk-latest` 稳定资产），提取 CI 优先使用 |
+| `extract-appsecret` | 每日 00:37（北京时间）+ 手动 | 从上游兼容 APK 提取密钥，使用接收端公钥加密，发布 `appsecret-latest/appsecret.bundle.json`，供现有服务自动更新 |
+| `fetch-lynkco-apk` | 上游每日 + 手动 | 拉取 APK 上传 Release；本 fork 的该 workflow 暂未启用，直接验证上游兼容资产 |
 
 ### 安全说明
 
-- 所有日志输出均脱敏（密钥值仅显示前 3 后 2 位），明文只写入本地 `env.json`（gitignore）；CI 提取时通过一次性链接送达明文（仅可打开 1 次，10 分钟失效）
+- 本 fork 的 CI 日志完全隐藏密钥值。明文 `env.json` 为 0600，结束时删除；只发布 RSA-OAEP + AES-GCM 加密文件，私钥仅保存在接收端。不会生成第三方明文取件链接。
 - CI 使用的 x86_64 模拟器镜像与 APK 均托管在仓库 Release（`sysimg-x86_64-33-r09` / `apk-latest`），版本经实测钉死，不随上游变动漂移
+
+2026-10-09 上游将 `apk-latest` 回退到 4.2.7；4.2.8 提取时进程主动退出，尚未兼容。本 fork 跟随上游的兼容资产，每次校验 SHA-256；这里的每日刷新表示每日重新提取和同步，密钥值可能保持相同，也不表示一定使用最新版 APK。若提取失败，现有配置保持原值。
+
+接收端部署和验证见 [每日密钥自动刷新](docs/每日密钥自动刷新.md)。本 fork 的签到和评论 workflow 仅允许手动触发，避免与现有服务重复执行。
 
 详细排障（镜像版本坑、IPv6 坑、forward 生命周期坑等）见 `docs/本地一键提取指南.md`。
 
