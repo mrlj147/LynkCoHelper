@@ -750,7 +750,9 @@ def send_cmd(child, cmd, timeout=15):
     except pexpect.EOF:
         raise Disconnected("jdb 已退出（EOF）")
     except (pexpect.TIMEOUT, OSError) as e:
-        raise Disconnected(f"等待命令回显失败（{cmd!r}）：{e}")
+        # pexpect's exception text includes recent buffers, potentially containing keys.
+        detail = type(e).__name__ if _in_ci() else str(e)
+        raise Disconnected(f"等待命令回显失败（{cmd!r}）：{detail}") from None
 
     parts = []
     first = True

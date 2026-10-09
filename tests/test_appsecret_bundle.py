@@ -85,6 +85,18 @@ class DeliveryTests(unittest.TestCase):
                 self.assertNotIn(value[:3], masked)
                 self.assertNotIn(value[-2:], masked)
 
+    def test_debugger_timeout_cannot_expose_secret_buffers_in_ci(self):
+        from unittest.mock import Mock
+        import pexpect
+        child = Mock()
+        secret = self.secrets['nativeAppSecret']
+        child.expect.side_effect = pexpect.TIMEOUT('recent buffer: ' + secret)
+        with patch.dict('os.environ', {'GITHUB_ACTIONS': 'true'}), \
+             patch.object(core, 'pexpect', pexpect, create=True), self.assertRaises(core.Disconnected) as error:
+            core.send_cmd(child, 'print field')
+        self.assertNotIn(secret, str(error.exception))
+        self.assertIn('TIMEOUT', str(error.exception))
+
     def test_workflow_has_daily_delivery_and_no_public_plaintext_link(self):
         import yaml
         text = (ROOT / '.github/workflows/extract-appsecret.yml').read_text()
