@@ -330,6 +330,44 @@ def _app_installed(tries=6, wait=5):
     sys.exit("[!] adb 持续无法查询设备（见上方错误），请检查 adb devices 后重试")
 
 
+def _latest_verified_release_apk():
+    """Require the official latest version and GitHub's asset SHA-256 to match."""
+    import hashlib
+    try:
+        with urllib.request.urlopen(LYNKCO_VER_API, timeout=20) as response:
+            data = json.load(response)
+        version = (data.get("data") or {}).get("androidNewestVersion", "").lstrip("V")
+        if not re.fullmatch(r"[0-9]+(?:\.[0-9]+){1,3}", version):
+            raise ValueError("invalid official APK version")
+        metadata_url = "https://api.github.com/repos/shovelshit/LynkCoHelper/releases/tags/apk-v" + version
+        request = urllib.request.Request(metadata_url, headers={"User-Agent": "lynkco-helper", "Accept": "application/vnd.github+json"})
+        with urllib.request.urlopen(request, timeout=20) as response:
+            release = json.load(response)
+        if release.get("tag_name") != "apk-v" + version:
+            raise ValueError("APK release version mismatch")
+        name = "lynkco-v" + version + ".apk"
+        asset = next(value for value in release.get("assets", []) if value.get("name") == name)
+        digest = asset.get("digest", "")
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+            raise ValueError("missing APK asset digest")
+    except Exception as error:
+        print("[*] Verified versioned APK release unavailable (" + type(error).__name__ + "), using official CDN.")
+        return None
+    destination = os.path.join(TOOLS_DIR, name)
+    url = "https://github.com/shovelshit/LynkCoHelper/releases/download/apk-v" + version + "/" + name
+    if not _try_download(url, destination, 320):
+        return None
+    checksum = hashlib.sha256()
+    with open(destination, "rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            checksum.update(chunk)
+    if "sha256:" + checksum.hexdigest() != digest:
+        os.remove(destination)
+        raise RuntimeError("Downloaded APK failed SHA-256 verification")
+    print("[+] Official latest APK version verified: " + version + "; SHA-256 verified.")
+    return destination
+
+
 def ensure_apk():
     """设备未装领克 App 时自动安装（平台无关）：查询官方接口拿最新
     版本号，从领克官方 CDN 下载（约 285MB，已下载则复用）后 adb install。
@@ -337,8 +375,8 @@ def ensure_apk():
     的稳定资产（仅 CI 启用；本地平台保持官方 CDN 直下）。"""
     if _app_installed():
         return
-    apk = None
-    if os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("LYNKCO_APK_SOURCE") != "official":
+    apk = _latest_verified_release_apk() if os.environ.get("LYNKCO_APK_SOURCE") == "verified-release" else None
+    if apk is None and os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("LYNKCO_APK_SOURCE") not in ("official", "verified-release"):
         # 写死上游仓库：fork 无 Release（fork 不复制 Release），动态拼
         # GITHUB_REPOSITORY 在 fork 上必然 404；失败仍有官方 CDN 兜底
         rel_url = ("https://github.com/shovelshit/LynkCoHelper/releases/download/"
