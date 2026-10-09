@@ -65,12 +65,13 @@ class VerifiedAPKTests(unittest.TestCase):
         output = io.StringIO()
         crash = 'Fatal signal SIGSEGV in libndk_translation.so; private-secret-fixture'
         with patch.dict('os.environ', {'GITHUB_ACTIONS': 'true'}), \
-             patch('appsecret_core.adb', side_effect=['', 'x86_64,arm64-v8a', crash]), \
+             patch('appsecret_core.adb', side_effect=['', 'x86_64,arm64-v8a', crash, 'reason=3 (LOW_MEMORY) status=9 private-secret-fixture']), \
              redirect_stdout(output):
             core._dump_device_diagnostics('fixture')
         self.assertNotIn('private-secret-fixture', output.getvalue())
         self.assertIn('SIGSEGV', output.getvalue())
         self.assertIn('libndk_translation.so', output.getvalue())
+        self.assertIn('LOW_MEMORY', output.getvalue())
 
 
 if __name__ == '__main__':

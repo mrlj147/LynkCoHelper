@@ -247,7 +247,10 @@ def _create_avd_manual(avd_name):
         f.write(f"abi.type={_ABI}\n")
         f.write(f"hw.cpu.arch={'x86_64' if _IS_X86_IMAGE else 'arm64'}\n")
         f.write("hw.cpu.ncore=4\n")
-        f.write("hw.ramSize=2048\n")
+        ram = int(os.environ.get("LYNKCO_EMULATOR_RAM_MB", "2048"))
+        if not 1024 <= ram <= 8192:
+            raise ValueError("Unsupported emulator RAM size")
+        f.write(f"hw.ramSize={ram}\n")
         f.write("hw.lcd.width=1080\n")
         f.write("hw.lcd.height=1920\n")
         f.write("hw.lcd.density=440\n")

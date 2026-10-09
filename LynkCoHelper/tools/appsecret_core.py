@@ -856,8 +856,16 @@ def _dump_device_diagnostics(tag):
             crash = adb("shell", "logcat", "-d", "-b", "crash", "-t", "100")
             signals = [name for name in ("SIGSEGV", "SIGABRT", "SIGILL", "SIGBUS") if name in crash]
             modules = sorted(set(re.findall(r"\b(lib[A-Za-z0-9_.-]+\.so)\b", crash)))[:15]
+            exit_info = adb("shell", "dumpsys", "activity", "exit-info", APP)
+            reasons = re.findall(r"\breason=(\d{1,2})\s*\(([A-Z_]+)\)", exit_info)[:3]
+            statuses = re.findall(r"\bstatus=(\d{1,3})\b", exit_info)[:3]
+            allowed = {"UNKNOWN", "EXIT_SELF", "SIGNALED", "LOW_MEMORY", "CRASH", "CRASH_NATIVE", "ANR",
+                       "INITIALIZATION_FAILURE", "PERMISSION_CHANGE", "EXCESSIVE_RESOURCE_USAGE",
+                       "USER_REQUESTED", "USER_STOPPED", "DEPENDENCY_DIED", "OTHER", "PACKAGE_UPDATED"}
+            reasons = [{'code': int(code), 'kind': name if name in allowed else 'OTHER'} for code, name in reasons]
             print("[*] Controlled device diagnostics: " + json.dumps({"process_alive": alive, "abi": abi,
-                                                                     "crash_signals": signals, "crash_modules": modules}))
+                                                                     "crash_signals": signals, "crash_modules": modules,
+                                                                     "exit_reasons": reasons, "exit_statuses": statuses}))
         except Exception as error:
             print("[*] Device diagnostic collection failed: " + type(error).__name__)
         return
