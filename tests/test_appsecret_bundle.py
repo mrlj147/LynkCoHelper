@@ -97,21 +97,12 @@ class DeliveryTests(unittest.TestCase):
         self.assertNotIn(secret, str(error.exception))
         self.assertIn('TIMEOUT', str(error.exception))
 
-    def test_workflow_has_daily_delivery_and_no_public_plaintext_link(self):
-        import yaml
-        text = (ROOT / '.github/workflows/extract-appsecret.yml').read_text()
-        workflow = yaml.safe_load(text)
-        trigger = workflow.get('on', workflow.get(True))
-        self.assertEqual(trigger['schedule'], [{'cron': '37 16 * * *'}])
-        self.assertNotIn('cloudcpp', text)
-        self.assertNotIn('upload-artifact', text)
-        steps = workflow['jobs']['extract']['steps']
-        encrypt = next(i for i, step in enumerate(steps) if step.get('name') == 'Encrypt and validate extracted keys')
-        publish = next(i for i, step in enumerate(steps) if step.get('name') == 'Publish encrypted latest keys')
-        self.assertLess(encrypt, publish)
-        self.assertNotIn('if', steps[publish])
-        self.assertEqual(steps[0]['with']['persist-credentials'], False)
-        self.assertEqual(steps[-2]['if'], 'always()')
+    def test_public_workflow_has_been_retired(self):
+        self.assertFalse((ROOT / '.github/workflows/extract-appsecret.yml').exists())
+        guide = (ROOT / 'LynkCoHelper/docs/每日密钥自动刷新.md').read_text()
+        self.assertIn('mrlj147/lynkco-build', guide)
+        self.assertIn('不再创建', guide)
+        self.assertIn('私有', guide)
 
 
 if __name__ == '__main__':
