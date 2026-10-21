@@ -37,12 +37,12 @@
 
 | Workflow | 触发 | 作用 |
 | --- | --- | --- |
-| `extract-appsecret` | 每日 00:37（北京时间）+ 手动 | 校验最新 APK 版本与 SHA-256，自动定位密钥类后提取，使用接收端公钥加密，发布 `appsecret-latest/appsecret.bundle.json`，供现有服务自动更新 |
+| `extract-appsecret` | 已退役 | 自动刷新已迁至私有仓库 `mrlj147/lynkco-build`；本公开仓库不再发布密钥或加密密钥包 |
 | `fetch-lynkco-apk` | 上游每日 + 手动 | 拉取 APK 上传 Release；本 fork 的该 workflow 暂未启用，直接验证上游兼容资产 |
 
 ### 安全说明
 
-- 本 fork 的 CI 日志完全隐藏密钥值。明文 `env.json` 为 0600，结束时删除；只发布 RSA-OAEP + AES-GCM 加密文件，私钥仅保存在接收端。不会生成第三方明文取件链接。
+- 自动 AppSecret 刷新已迁至私有仓库，本仓库不再创建 `appsecret-latest` Release 或上传密钥包。私有流程只保留短期加密 Actions 产物，接收私钥和只读凭据均保存在 VM。
 - CI 模拟器镜像固定为经验证的 `sysimg-x86_64-33-r09`；APK 依据官方最新版本选择对应 `apk-vVERSION` Release 资产，并校验 SHA-256。
 
 2026-10-12 已接入上游 `8c31eb2` 的自动定位修复：4.2.8 的密钥类从 `$g` 变成 `$f`，现在根据 APK 内容定位实际类，不再依赖固定类名。此前仅临时使用 4.2.7；现在恢复提取官方最新版本。每日刷新表示每日重新提取和同步，密钥值可能保持相同。若提取失败，现有配置保持原值。
